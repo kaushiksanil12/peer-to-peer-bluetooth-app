@@ -206,7 +206,7 @@ router.post('/find-forwarders', authMiddleware, [
   }
 });
 
-// Admin routes remain the same...
+// Admin routes
 router.post('/admin/reset-daily-counters', authMiddleware, async (req, res) => {
   try {
     const result = await Gateway.resetDailyCounters();

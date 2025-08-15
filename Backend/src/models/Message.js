@@ -6,6 +6,7 @@ const messageSchema = new mongoose.Schema({
     required: true,
     unique: true,
     default: function() {
+      // Generate unique message ID with timestamp and random string
       return `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     }
   },
