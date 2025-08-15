@@ -1,5 +1,5 @@
-const Message = require('../models/Message');
-const GatewayService = require('../services/GatewayService');
+import Message from '../models/Message.js';
+import GatewayService from '../services/GatewayService.js';
 
 class MessageService {
   static async createMessage(data) {
@@ -23,4 +23,4 @@ class MessageService {
   }
 }
 
-module.exports = MessageService;
+export default MessageService;

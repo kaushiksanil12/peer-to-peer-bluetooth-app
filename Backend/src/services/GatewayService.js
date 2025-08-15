@@ -1,6 +1,6 @@
-const Gateway = require('../models/Gateway');
-const geolib = require('geolib');
-const winston = require('winston');
+import Gateway from '../models/Gateway.js';
+import geolib from 'geolib';
+import winston from 'winston';
 
 const logger = winston.createLogger({
   level: 'info',
@@ -239,4 +239,4 @@ class GatewayService {
   }
 }
 
-module.exports = GatewayService;
+export default GatewayService;

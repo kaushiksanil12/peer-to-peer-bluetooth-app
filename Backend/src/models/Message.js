@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const messageSchema = new mongoose.Schema({
   messageId: {
@@ -62,4 +62,4 @@ messageSchema.index({ recipientId: 1, status: 1 });
 messageSchema.index({ messageId: 1 });
 messageSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
-module.exports = mongoose.model('Message', messageSchema);
+export default mongoose.model('Message', messageSchema);

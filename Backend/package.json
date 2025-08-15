@@ -1,6 +1,7 @@
 {
   "name": "p2p-bluetooth-messaging-backend",
   "version": "2.0.0",
+  "type": "module",
   "main": "src/server.js",
   "scripts": {
     "dev": "nodemon src/server.js",

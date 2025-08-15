@@ -1,8 +1,8 @@
-const express = require('express');
-const { body, query, validationResult } = require('express-validator');
-const Gateway = require('../models/Gateway');
-const authMiddleware = require('../middleware/auth');
-const winston = require('winston');
+import express from 'express';
+import { body, query, validationResult } from 'express-validator';
+import Gateway from '../models/Gateway.js';
+import authMiddleware from '../middleware/auth.js';
+import winston from 'winston';
 
 const router = express.Router();
 
@@ -220,4 +220,4 @@ router.post('/admin/reset-daily-counters', authMiddleware, async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;

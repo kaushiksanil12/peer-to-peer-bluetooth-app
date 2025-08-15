@@ -1,4 +1,4 @@
-const redis = require('redis');
+import redis from 'redis';
 
 const client = redis.createClient({ url: process.env.REDIS_URL });
 client.connect().catch(console.error);
@@ -8,4 +8,4 @@ async function cacheMessage(id, data) {
   await client.set(id, JSON.stringify(data), { EX: 3600 });  // Expire in 1 hour
 }
 
-module.exports = { cacheMessage /* Add more methods */ };
+export { cacheMessage /* Add more methods */ };

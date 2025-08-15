@@ -1,7 +1,7 @@
-const Gateway = require('../models/Gateway');
-const Message = require('../models/Message');
-const geolib = require('geolib');
-const winston = require('winston');
+import Gateway from '../models/Gateway.js';
+import Message from '../models/Message.js';
+import geolib from 'geolib';
+import winston from 'winston';
 
 const logger = winston.createLogger({
   level: 'info',
@@ -288,4 +288,4 @@ class ProximityService {
   }
 }
 
-module.exports = ProximityService;
+export default ProximityService;

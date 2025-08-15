@@ -1,5 +1,5 @@
-const mongoose = require('mongoose');
-const winston = require('winston');
+import mongoose from 'mongoose';
+import winston from 'winston';
 
 const logger = winston.createLogger({ level: 'info', format: winston.format.json(), transports: [new winston.transports.Console()] });
 
@@ -19,4 +19,4 @@ const connectDB = async () => {
   }
 };
 
-module.exports = { connectDB };
+export { connectDB };

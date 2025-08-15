@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const gatewaySchema = new mongoose.Schema({
   deviceId: { type: String, required: true, unique: true },
@@ -254,4 +254,4 @@ gatewaySchema.statics.cleanupInactive = function(inactiveHours = 24) {
   );
 };
 
-module.exports = mongoose.model('Gateway', gatewaySchema);
+export default mongoose.model('Gateway', gatewaySchema);

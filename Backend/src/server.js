@@ -1,27 +1,28 @@
-require('dotenv').config();
-const express = require('express');
-const http = require('http');
-const socketIo = require('socket.io');
-const cors = require('cors');
-const helmet = require('helmet');
-const compression = require('compression');
-const rateLimit = require('express-rate-limit');
-const winston = require('winston');
-const cron = require('node-cron');
+import 'dotenv/config';
+import express from 'express';
+import http from 'http';
+import { Server as socketIo } from 'socket.io';
+import cors from 'cors';
+import helmet from 'helmet';
+import compression from 'compression';
+import rateLimit from 'express-rate-limit';
+import winston from 'winston';
+import cron from 'node-cron';
 
-// Import routes and services
-const { connectDB } = require('./config/database');
-const authRoutes = require('./routes/auth');
-const messageRoutes = require('./routes/messages');
-const gatewayRoutes = require('./routes/gateway');
-const authMiddleware = require('./middleware/auth');
-const MessageService = require('./services/MessageService');
-const GatewayService = require('./services/GatewayService');
-const ProximityService = require('./services/ProximityService');
+import { connectDB } from './config/database.js';
+import authRoutes from './routes/auth.js';
+import messageRoutes from './routes/messages.js';
+import gatewayRoutes from './routes/gateway.js';
+import authMiddleware from './middleware/auth.js';
+import MessageService from './services/MessageService.js';
+import GatewayService from './services/GatewayService.js';
+import ProximityService from './services/ProximityService.js';
+import mongoose from 'mongoose';
+import Gateway from './models/Gateway.js';
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server, { 
+const io = new socketIo(server, { 
   cors: { 
     origin: '*',
     methods: ['GET', 'POST']
@@ -198,7 +199,7 @@ cron.schedule('0 0 * * *', () => {
   logger.info('Running daily maintenance...');
   GatewayService.cleanupInactiveGateways();
   // Reset daily forwarding counters
-  require('./models/Gateway').updateMany(
+  Gateway.updateMany(
     {},
     { $set: { 'forwardingPreferences.currentDailyForwards': 0 } }
   );
@@ -225,10 +226,10 @@ server.listen(PORT, () => {
 process.on('SIGTERM', () => {
   logger.info('SIGTERM received, shutting down gracefully...');
   server.close(() => {
-    require('mongoose').connection.close();
+    mongoose.connection.close();
     logger.info('Server shutdown complete');
     process.exit(0);
   });
 });
 
-module.exports = { app, server };
+export { app, server };

@@ -1,9 +1,9 @@
-const express = require('express');
-const { body, validationResult } = require('express-validator');
-const Message = require('../models/Message');
-const Gateway = require('../models/Gateway');
-const authMiddleware = require('../middleware/auth');
-const winston = require('winston');
+import express from 'express';
+import { body, validationResult } from 'express-validator';
+import Message from '../models/Message.js';
+import Gateway from '../models/Gateway.js';
+import authMiddleware from '../middleware/auth.js';
+import winston from 'winston';
 
 const router = express.Router();
 
@@ -523,4 +523,4 @@ router.post('/admin/cleanup-expired', authMiddleware, async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;
