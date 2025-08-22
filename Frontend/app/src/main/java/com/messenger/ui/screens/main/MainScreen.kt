@@ -2,8 +2,9 @@ package com.messenger.ui.screens.main
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Dashboard // <-- Add this import
-import androidx.compose.material.icons.filled.Message    // <-- Add this import
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.Message
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -18,9 +19,11 @@ object MainAppRoutes {
     const val MESSAGES = "main/messages"
 }
 
-@Composable
 @OptIn(ExperimentalMaterial3Api::class)
-fun MainScreen() {
+@Composable
+fun MainScreen(
+    onNavigateToCompose: () -> Unit
+) {
     val navController = rememberNavController()
     var currentTitle by remember { mutableStateOf("Dashboard") }
 
@@ -43,7 +46,6 @@ fun MainScreen() {
                         currentTitle = "Dashboard"
                     },
                     label = { Text("Dashboard") },
-                    // The icon now resolves correctly
                     icon = { Icon(Icons.Default.Dashboard, contentDescription = "Dashboard") }
                 )
                 NavigationBarItem(
@@ -53,9 +55,13 @@ fun MainScreen() {
                         currentTitle = "Messages"
                     },
                     label = { Text("Messages") },
-                    // The icon now resolves correctly
                     icon = { Icon(Icons.Default.Message, contentDescription = "Messages") }
                 )
+            }
+        },
+        floatingActionButton = {
+            FloatingActionButton(onClick = onNavigateToCompose) {
+                Icon(Icons.Default.Add, contentDescription = "New Message")
             }
         }
     ) { innerPadding ->
