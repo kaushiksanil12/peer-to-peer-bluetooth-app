@@ -102,6 +102,7 @@ dependencies {
     implementation("androidx.hilt:hilt-work:1.2.0")
     kapt("androidx.hilt:hilt-compiler:1.2.0")
     implementation("com.google.accompanist:accompanist-permissions:0.34.0")
+    implementation("com.google.crypto.tink:tink-android:1.13.0")
 }
 
 // Allow Hilt to process kapt stubs

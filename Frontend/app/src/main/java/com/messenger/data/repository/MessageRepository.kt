@@ -1,7 +1,10 @@
 package com.messenger.data.repository
 
+import android.bluetooth.BluetoothProfile
 import android.content.Context
 import androidx.work.*
+import com.messenger.ble.GATTClientService
+import com.messenger.crypto.CryptoService
 import com.messenger.data.local.MessageDao
 import com.messenger.data.local.MessageEntity
 import com.messenger.data.local.SessionManager
@@ -21,99 +24,110 @@ class MessageRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val apiService: ApiService,
     private val messageDao: MessageDao,
-    private val sessionManager: SessionManager
+    private val sessionManager: SessionManager,
+    private val gattClientService: GATTClientService,
+    private val cryptoService: CryptoService
 ) {
 
-    // The UI will observe this Flow to get real-time updates from the database
     fun getAllMessages(): Flow<List<MessageEntity>> {
         return messageDao.getAllMessages()
     }
 
-    // Fetches new messages from the network and updates the local database
     suspend fun refreshMessages() {
-        val deviceId = sessionManager.getDeviceId() ?: return // Can't refresh without a deviceId
+        val deviceId = sessionManager.getDeviceId() ?: return
         try {
             val response = apiService.getPendingMessages(deviceId)
             if (response.isSuccessful) {
                 response.body()?.forEach { messageDto ->
-                    // Convert API DTO to a database Entity and insert it
                     val messageEntity = messageDto.toEntity(receiverId = deviceId)
                     messageDao.insertMessage(messageEntity)
                 }
             }
         } catch (e: Exception) {
-            // Handle network errors, maybe log them
             e.printStackTrace()
         }
     }
 
-    // This is the function for the worker to sync all pending messages
     suspend fun syncOfflineMessages() {
         val unsyncedMessages = messageDao.getUnsyncedMessages()
         unsyncedMessages.forEach { message ->
             try {
-                val request = SendMessageRequest(message.content, message.receiverId)
+                // Encrypt content before sending to the server
+                val encryptedContentString = message.content // Assuming content is stored encrypted
+                val request = SendMessageRequest(encryptedContentString, message.receiverId)
                 val response = apiService.sendMessage(request)
                 if (response.isSuccessful) {
                     messageDao.markMessageAsSynced(message.id)
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
-                // If one message fails, we continue to the next one
-                // The failed one will be retried the next time the worker runs
             }
         }
     }
 
-    // Saves a message locally and schedules a background job to send it
     suspend fun sendMessage(receiverId: String, content: String) {
         val deviceId = sessionManager.getDeviceId() ?: return
 
+        // 1. Establish a shared key if one doesn't exist
+        cryptoService.establishSharedKey(receiverId)
+
+        // 2. Encrypt the message content
+        val encryptedContent = cryptoService.encrypt(content, receiverId)
+        if (encryptedContent == null) {
+            println("Encryption failed!")
+            return
+        }
+
+        // In a real app, you would Base64 encode the byte array for transport
+        val encryptedContentString = String(encryptedContent, Charsets.ISO_8859_1)
+
         val messageEntity = MessageEntity(
             id = UUID.randomUUID().toString(),
-            content = content,
+            content = encryptedContentString,
             senderId = deviceId,
             receiverId = receiverId,
             timestamp = System.currentTimeMillis(),
             isSynced = false
         )
-        messageDao.insertMessage(messageEntity)
 
-        // Schedule a background sync to send the message
-        scheduleMessageSync()
+        // Priority 1: Check for an active P2P connection
+        if (gattClientService.connectionState.value == BluetoothProfile.STATE_CONNECTED) {
+            gattClientService.writeMessage(encryptedContentString)
+            messageDao.insertMessage(messageEntity.copy(isSynced = true))
+        } else {
+            // Priority 2: Fallback to internet via offline queue
+            messageDao.insertMessage(messageEntity)
+            scheduleMessageSync()
+        }
     }
 
     private fun scheduleMessageSync() {
-        // Define the constraints for the work (e.g., must have network)
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()
 
-        // Create a unique work request to avoid scheduling the same job multiple times
         val syncRequest = OneTimeWorkRequestBuilder<SyncWorker>()
             .setConstraints(constraints)
-            .setBackoffCriteria( // If the job fails, retry with a delay
+            .setBackoffCriteria(
                 BackoffPolicy.LINEAR,
                 10,
                 TimeUnit.SECONDS
             )
             .build()
 
-        // Enqueue the unique work request
         WorkManager.getInstance(context).enqueueUniqueWork(
             "message_sync_work",
-            ExistingWorkPolicy.KEEP, // Don't replace the job if it's already scheduled
+            ExistingWorkPolicy.KEEP,
             syncRequest
         )
     }
 
-    // Helper to convert from a network DTO to a database Entity
     private fun MessageDto.toEntity(receiverId: String) = MessageEntity(
         id = this.id,
-        content = this.content,
+        content = this.content, // Note: This assumes incoming messages are not encrypted yet
         senderId = this.senderId,
-        receiverId = receiverId, // The current user is the receiver
+        receiverId = receiverId,
         timestamp = this.timestamp,
-        isSynced = true // It came from the server, so it's synced
+        isSynced = true
     )
 }
