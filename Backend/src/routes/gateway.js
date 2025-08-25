@@ -206,6 +206,19 @@ router.post('/find-forwarders', authMiddleware, [
   }
 });
 
+router.get('/:deviceId', authMiddleware, async (req, res) => {
+  try {
+    const gateway = await Gateway.findOne({ deviceId: req.params.deviceId }).lean();
+    if (!gateway) {
+      return res.status(404).json({ msg: 'Gateway not found' });
+    }
+    res.json(gateway);
+  } catch (err) {
+    logger.error(`Error fetching gateway details: ${err.message}`);
+    res.status(500).json({ msg: 'Server error' });
+  }
+});
+
 // Admin routes
 router.post('/admin/reset-daily-counters', authMiddleware, async (req, res) => {
   try {
