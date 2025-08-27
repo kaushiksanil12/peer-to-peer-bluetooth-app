@@ -6,6 +6,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.SupportSQLiteOpenHelper
 import com.econet.data.AppRepository
 import com.econet.data.local.AppDatabase
+import com.econet.data.local.ConversationDao
 import com.econet.data.local.MessageDao
 import com.econet.data.remote.ApiService
 import dagger.Module
@@ -45,8 +46,18 @@ object AppModule {
     }
 
     @Provides
-    @Singleton
-    fun provideAppRepository(messageDao: MessageDao, apiService: ApiService): AppRepository {
-        return AppRepository(messageDao, apiService)
+    fun provideConversationDao(appDatabase: AppDatabase): ConversationDao {
+        return appDatabase.conversationDao()
     }
+
+    @Provides
+    @Singleton
+    fun provideAppRepository(
+        messageDao: MessageDao,
+        conversationDao: ConversationDao, // <-- Add this
+        apiService: ApiService
+    ): AppRepository {
+        return AppRepository(messageDao, conversationDao, apiService) // <-- And this
+    }
+
 }

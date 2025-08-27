@@ -35,18 +35,18 @@ class BleMeshService : Service() {
     @Inject
     lateinit var gson: Gson
 
+    // ... (service variables)
     private val serviceScope = CoroutineScope(Dispatchers.IO)
     private val connectedEndpoints = mutableSetOf<String>()
     private lateinit var connectionsClient: ConnectionsClient
     private val serviceId = "com.econet.SERVICE_ID"
-    private var myName = "EconetDevice" // Default name
+    private var myName = "EconetDevice"
 
-    // --- Service Lifecycle ---
-
+    // ... (onCreate, onStartCommand, onDestroy, onBind)
     override fun onCreate() {
         super.onCreate()
         connectionsClient = Nearby.getConnectionsClient(this)
-        myName = prefsHelper.userName ?: myName // Load user's name
+        myName = prefsHelper.userName ?: myName
         ServiceManager.bleMeshService = this
         Log.d(TAG, "Service created. My device name: $myName")
     }
@@ -61,7 +61,6 @@ class BleMeshService : Service() {
         } else {
             Log.e(TAG, "Service cannot start without necessary permissions.")
         }
-
         return START_STICKY
     }
 
@@ -74,7 +73,8 @@ class BleMeshService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    // --- Public Service Method ---
+
+    // --- Public Service Methods ---
 
     fun sendMessage(messageEntity: MessageEntity) {
         val payload = Payload.fromBytes(gson.toJson(messageEntity).toByteArray(Charsets.UTF_8))
@@ -86,8 +86,17 @@ class BleMeshService : Service() {
         }
     }
 
-    // --- Nearby Connections Logic ---
+    /**
+     * New public method to manually initiate a connection to a specific device.
+     */
+    fun connectToEndpoint(endpointId: String) {
+        Log.d(TAG, "Manually requesting connection to $endpointId")
+        connectionsClient.requestConnection(myName, endpointId, connectionLifecycleCallback)
+            .addOnSuccessListener { Log.d(TAG, "Manual connection requested successfully.") }
+            .addOnFailureListener { e -> Log.e(TAG, "Manual connection request failed.", e) }
+    }
 
+    // ... (startAdvertising, startDiscovery)
     private fun startAdvertising() {
         val advertisingOptions = AdvertisingOptions.Builder().setStrategy(Strategy.P2P_CLUSTER).build()
         connectionsClient.startAdvertising(
@@ -110,21 +119,24 @@ class BleMeshService : Service() {
         }
     }
 
+
     // --- Callbacks for Nearby Connections ---
 
     private val endpointDiscoveryCallback = object : EndpointDiscoveryCallback() {
         override fun onEndpointFound(endpointId: String, info: DiscoveredEndpointInfo) {
             Log.d(TAG, "Endpoint found: $endpointId, name: ${info.endpointName}")
-            connectionsClient.requestConnection(myName, endpointId, connectionLifecycleCallback)
-                .addOnSuccessListener { Log.d(TAG, "Connection requested to $endpointId") }
-                .addOnFailureListener { e -> Log.e(TAG, "Failed to request connection", e) }
+            // IMPORTANT: We no longer connect automatically.
+            // The service will now wait for the user to select a device from the UI.
+            // TODO: Notify the ViewModel/UI that a new device is available to connect to.
         }
 
         override fun onEndpointLost(endpointId: String) {
             Log.d(TAG, "Endpoint lost: $endpointId")
+            // TODO: Notify the ViewModel/UI that a device is no longer available.
         }
     }
 
+    // ... (connectionLifecycleCallback and payloadCallback are the same)
     private val connectionLifecycleCallback = object : ConnectionLifecycleCallback() {
         override fun onConnectionInitiated(endpointId: String, info: ConnectionInfo) {
             Log.d(TAG, "Connection initiated by ${info.endpointName}")
@@ -176,8 +188,8 @@ class BleMeshService : Service() {
         }
     }
 
-    // --- Foreground Service Notification & Permissions ---
 
+    // ... (createNotification and hasPermissions are the same)
     private fun createNotification(): Notification {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
@@ -209,4 +221,5 @@ class BleMeshService : Service() {
         private const val NOTIFICATION_ID = 1
         private const val CHANNEL_ID = "EconetServiceChannel"
     }
+
 }

@@ -1,0 +1,59 @@
+package com.econet.ui.screens.discover
+
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DiscoverScreen(
+    onDeviceSelected: () -> Unit,
+    discoverViewModel: DiscoverViewModel = hiltViewModel()
+) {
+    val devices by discoverViewModel.discoveredDevices.collectAsState()
+
+    Scaffold(
+        topBar = {
+            TopAppBar(title = { Text("Nearby Devices") })
+        }
+    ) { paddingValues ->
+        Column(modifier = Modifier.padding(paddingValues).padding(16.dp)) {
+            if (devices.isEmpty()) {
+                Text("Searching for nearby devices...")
+            } else {
+                LazyColumn {
+                    items(devices) { device ->
+                        DeviceListItem(device = device) {
+                            discoverViewModel.connectToDevice(device.endpointId)
+                            onDeviceSelected() // Navigate to messaging screen
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun DeviceListItem(device: DiscoveredDevice, onClick: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .clickable(onClick = onClick)
+    ) {
+        Text(
+            text = device.name,
+            modifier = Modifier.padding(16.dp),
+            style = MaterialTheme.typography.bodyLarge
+        )
+    }
+}

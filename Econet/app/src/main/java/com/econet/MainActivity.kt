@@ -18,6 +18,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.econet.ble.BleMeshService
+import com.econet.ui.screens.chats.ChatsScreen
 import com.econet.ui.screens.messaging.MessagingScreen
 import com.econet.ui.screens.profile.ProfileScreen
 import com.econet.ui.theme.EconetTheme
@@ -31,16 +32,13 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var prefsHelper: SharedPreferencesHelper
 
-    // 1. Create the permission launcher
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         if (permissions.values.all { it }) {
-            // All permissions were granted, start the service
             startBleService()
         } else {
-            // Handle the case where the user denies permissions
-            // TODO: Show a message to the user explaining why permissions are needed
+            // TODO: Show a message explaining why permissions are needed.
         }
     }
 
@@ -58,22 +56,33 @@ class MainActivity : ComponentActivity() {
                     val navController = rememberNavController()
                     NavHost(
                         navController = navController,
-                        startDestination = if (isProfileCreated) "messaging" else "profile"
+                        // If profile is created, start at the new chats list. Otherwise, start at profile creation.
+                        startDestination = if (isProfileCreated) "chats" else "profile"
                     ) {
                         composable("profile") {
                             ProfileScreen(
                                 onRegistrationSuccess = {
-                                    navController.navigate("messaging") {
+                                    navController.navigate("chats") {
                                         popUpTo("profile") { inclusive = true }
                                     }
                                 }
                             )
                         }
-                        composable("messaging") {
-                            // 2. Trigger the permission request when the messaging screen is shown
+                        composable("chats") {
+                            // When the chats screen is shown, request P2P permissions
                             LaunchedEffect(Unit) {
                                 requestPermissions()
                             }
+                            ChatsScreen(
+                                onConversationSelected = { partnerId ->
+                                    // Navigate to a specific chat screen
+                                    navController.navigate("messaging/$partnerId")
+                                }
+                            )
+                        }
+                        composable("messaging/{partnerId}") { backStackEntry ->
+                            // Extract the partnerId, though we aren't using it in the ViewModel yet
+                            val partnerId = backStackEntry.arguments?.getString("partnerId")
                             MessagingScreen()
                         }
                     }
@@ -82,7 +91,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // 3. A function to check for and request permissions
     private fun requestPermissions() {
         val hasPermissions = REQUIRED_PERMISSIONS.all {
             ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
@@ -91,18 +99,19 @@ class MainActivity : ComponentActivity() {
         if (!hasPermissions) {
             permissionLauncher.launch(REQUIRED_PERMISSIONS)
         } else {
-            // Permissions are already granted, start the service directly
             startBleService()
         }
     }
 
-    // 4. A helper function to start the service
     private fun startBleService() {
         val serviceIntent = Intent(this, BleMeshService::class.java)
-        startForegroundService(serviceIntent)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent)
+        } else {
+            startService(serviceIntent)
+        }
     }
 
-    // 5. Define the required permissions based on Android version
     companion object {
         private val REQUIRED_PERMISSIONS =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
