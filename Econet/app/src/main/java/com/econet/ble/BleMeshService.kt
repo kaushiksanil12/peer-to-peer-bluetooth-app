@@ -1,4 +1,4 @@
-package com.econet.ble // Corrected package name
+package com.econet.ble
 
 import android.Manifest
 import android.app.Notification
@@ -13,49 +13,53 @@ import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import com.econet.R
+import com.econet.data.AppRepository
+import com.econet.data.local.MessageEntity
+import com.econet.util.SharedPreferencesHelper
 import com.google.android.gms.nearby.Nearby
-import com.google.android.gms.nearby.connection.AdvertisingOptions
-import com.google.android.gms.nearby.connection.ConnectionInfo
-import com.google.android.gms.nearby.connection.ConnectionLifecycleCallback
-import com.google.android.gms.nearby.connection.ConnectionResolution
-import com.google.android.gms.nearby.connection.ConnectionsClient
-import com.google.android.gms.nearby.connection.DiscoveredEndpointInfo
-import com.google.android.gms.nearby.connection.DiscoveryOptions
-import com.google.android.gms.nearby.connection.EndpointDiscoveryCallback
-import com.google.android.gms.nearby.connection.Payload
-import com.google.android.gms.nearby.connection.PayloadCallback
-import com.google.android.gms.nearby.connection.PayloadTransferUpdate
-import com.google.android.gms.nearby.connection.Strategy
+import com.google.android.gms.nearby.connection.*
+import com.google.gson.Gson
 import dagger.hilt.android.AndroidEntryPoint
-import com.google.android.gms.nearby.connection.ConnectionsStatusCodes
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
 class BleMeshService : Service() {
 
+    @Inject
+    lateinit var repository: AppRepository
+    @Inject
+    lateinit var prefsHelper: SharedPreferencesHelper
+    @Inject
+    lateinit var gson: Gson
+
+    private val serviceScope = CoroutineScope(Dispatchers.IO)
+    private val connectedEndpoints = mutableSetOf<String>()
     private lateinit var connectionsClient: ConnectionsClient
-    private val SERVICE_ID = "com.econet.SERVICE_ID"
-    private var myName: String = "DefaultDeviceName" // Will be loaded from SharedPreferences
+    private val serviceId = "com.econet.SERVICE_ID"
+    private var myName = "EconetDevice" // Default name
 
     // --- Service Lifecycle ---
 
     override fun onCreate() {
         super.onCreate()
         connectionsClient = Nearby.getConnectionsClient(this)
-        // TODO: Load user profile (name, userId) from SharedPreferences
+        myName = prefsHelper.userName ?: myName // Load user's name
+        ServiceManager.bleMeshService = this
+        Log.d(TAG, "Service created. My device name: $myName")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startForeground(NOTIFICATION_ID, createNotification())
         Log.d(TAG, "Service started")
 
-        // Check for permissions before starting discovery and advertising
         if (hasPermissions()) {
-            startDiscovery()
             startAdvertising()
+            startDiscovery()
         } else {
-            Log.e(TAG, "Missing necessary permissions for Nearby Connections.")
-            // In a real app, you'd request permissions from the UI before starting the service.
+            Log.e(TAG, "Service cannot start without necessary permissions.")
         }
 
         return START_STICKY
@@ -64,11 +68,22 @@ class BleMeshService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         connectionsClient.stopAllEndpoints()
+        ServiceManager.bleMeshService = null
         Log.d(TAG, "Service destroyed")
     }
 
-    override fun onBind(intent: Intent?): IBinder? {
-        return null // Not a bound service
+    override fun onBind(intent: Intent?): IBinder? = null
+
+    // --- Public Service Method ---
+
+    fun sendMessage(messageEntity: MessageEntity) {
+        val payload = Payload.fromBytes(gson.toJson(messageEntity).toByteArray(Charsets.UTF_8))
+        if (connectedEndpoints.isNotEmpty()) {
+            connectionsClient.sendPayload(ArrayList(connectedEndpoints), payload)
+            Log.d(TAG, "Broadcasting message to ${connectedEndpoints.size} endpoints")
+        } else {
+            Log.d(TAG, "No connected endpoints to send message to.")
+        }
     }
 
     // --- Nearby Connections Logic ---
@@ -76,7 +91,7 @@ class BleMeshService : Service() {
     private fun startAdvertising() {
         val advertisingOptions = AdvertisingOptions.Builder().setStrategy(Strategy.P2P_CLUSTER).build()
         connectionsClient.startAdvertising(
-            myName, SERVICE_ID, connectionLifecycleCallback, advertisingOptions
+            myName, serviceId, connectionLifecycleCallback, advertisingOptions
         ).addOnSuccessListener {
             Log.d(TAG, "Advertising started successfully")
         }.addOnFailureListener { e ->
@@ -87,7 +102,7 @@ class BleMeshService : Service() {
     private fun startDiscovery() {
         val discoveryOptions = DiscoveryOptions.Builder().setStrategy(Strategy.P2P_CLUSTER).build()
         connectionsClient.startDiscovery(
-            SERVICE_ID, endpointDiscoveryCallback, discoveryOptions
+            serviceId, endpointDiscoveryCallback, discoveryOptions
         ).addOnSuccessListener {
             Log.d(TAG, "Discovery started successfully")
         }.addOnFailureListener { e ->
@@ -98,15 +113,11 @@ class BleMeshService : Service() {
     // --- Callbacks for Nearby Connections ---
 
     private val endpointDiscoveryCallback = object : EndpointDiscoveryCallback() {
-        override fun onEndpointFound(endpointId: String, discoveredEndpointInfo: DiscoveredEndpointInfo) {
-            Log.d(TAG, "Endpoint found: $endpointId, name: ${discoveredEndpointInfo.endpointName}")
-            // An endpoint was found. We request a connection to it.
+        override fun onEndpointFound(endpointId: String, info: DiscoveredEndpointInfo) {
+            Log.d(TAG, "Endpoint found: $endpointId, name: ${info.endpointName}")
             connectionsClient.requestConnection(myName, endpointId, connectionLifecycleCallback)
-                .addOnSuccessListener {
-                    Log.d(TAG, "Connection requested to $endpointId")
-                }.addOnFailureListener { e ->
-                    Log.e(TAG, "Failed to request connection to $endpointId", e)
-                }
+                .addOnSuccessListener { Log.d(TAG, "Connection requested to $endpointId") }
+                .addOnFailureListener { e -> Log.e(TAG, "Failed to request connection", e) }
         }
 
         override fun onEndpointLost(endpointId: String) {
@@ -115,9 +126,8 @@ class BleMeshService : Service() {
     }
 
     private val connectionLifecycleCallback = object : ConnectionLifecycleCallback() {
-        override fun onConnectionInitiated(endpointId: String, connectionInfo: ConnectionInfo) {
-            Log.d(TAG, "Connection initiated by ${connectionInfo.endpointName}")
-            // Automatically accept the connection on both sides.
+        override fun onConnectionInitiated(endpointId: String, info: ConnectionInfo) {
+            Log.d(TAG, "Connection initiated by ${info.endpointName}")
             connectionsClient.acceptConnection(endpointId, payloadCallback)
         }
 
@@ -125,61 +135,58 @@ class BleMeshService : Service() {
             when (result.status.statusCode) {
                 ConnectionsStatusCodes.STATUS_OK -> {
                     Log.d(TAG, "Connection successful with $endpointId")
-                    // TODO: Notify ViewModel that we have a new connection
+                    connectedEndpoints.add(endpointId)
                 }
                 ConnectionsStatusCodes.STATUS_CONNECTION_REJECTED -> Log.d(TAG, "Connection rejected by $endpointId")
                 ConnectionsStatusCodes.STATUS_ERROR -> Log.e(TAG, "Connection error with $endpointId")
-                else -> Log.d(TAG, "Connection result unknown status for $endpointId")
+                else -> Log.d(TAG, "Connection result unknown for $endpointId")
             }
         }
 
         override fun onDisconnected(endpointId: String) {
             Log.d(TAG, "Disconnected from $endpointId")
-            // TODO: Notify ViewModel that a connection was lost
+            connectedEndpoints.remove(endpointId)
         }
     }
 
     private val payloadCallback = object : PayloadCallback() {
         override fun onPayloadReceived(endpointId: String, payload: Payload) {
-            // A payload has been received from the other device.
-            when(payload.type) {
-                Payload.Type.BYTES -> {
-                    val receivedBytes = payload.asBytes()!!
-                    val message = String(receivedBytes, Charsets.UTF_8)
-                    Log.d(TAG, "Message received from $endpointId: $message")
-                    // TODO: Deserialize the message string into a MessagePacket object
-                    // TODO: Pass the message to the MessagingViewModel to display
-                    // TODO: Implement the multi-hop relay logic here
-                }
-                Payload.Type.FILE -> {
-                    // TODO: Handle incoming file payload
-                    Log.d(TAG, "File received from $endpointId")
-                }
-                else -> {
-                    Log.d(TAG, "Stream received from $endpointId")
+            if (payload.type == Payload.Type.BYTES) {
+                val receivedBytes = payload.asBytes() ?: return
+                try {
+                    val messageJson = String(receivedBytes, Charsets.UTF_8)
+                    val messageEntity = gson.fromJson(messageJson, MessageEntity::class.java)
+                    val incomingMessage = messageEntity.copy(isFromMe = false)
+
+                    Log.d(TAG, "Message received and parsed from $endpointId: ${incomingMessage.textPayload}")
+
+                    serviceScope.launch {
+                        repository.insertMessage(incomingMessage)
+                    }
+                    // TODO: Implement multi-hop logic here
+
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to parse payload.", e)
                 }
             }
         }
 
         override fun onPayloadTransferUpdate(endpointId: String, update: PayloadTransferUpdate) {
-            // Provides updates on the status of the payload transfer.
-            // Useful for showing progress bars for file transfers.
+            // Useful for tracking file transfer progress
         }
     }
 
-    // --- Foreground Service Notification ---
+    // --- Foreground Service Notification & Permissions ---
 
     private fun createNotification(): Notification {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 "Econet Service",
-                NotificationManager.IMPORTANCE_DEFAULT
+                NotificationManager.IMPORTANCE_LOW
             )
-            val manager = getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(channel)
+            getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         }
-
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Econet Mesh")
             .setContentText("Actively searching for nearby devices.")
@@ -187,11 +194,7 @@ class BleMeshService : Service() {
             .build()
     }
 
-    // --- Permissions ---
-
     private fun hasPermissions(): Boolean {
-        // For Nearby Connections, a coarse location permission is sufficient on some versions.
-        // On Android 12+, we need explicit Bluetooth permissions.
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_ADVERTISE) == PackageManager.PERMISSION_GRANTED &&
                     ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED &&

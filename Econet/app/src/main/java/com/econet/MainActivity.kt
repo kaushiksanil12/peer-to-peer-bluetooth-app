@@ -99,11 +99,7 @@ class MainActivity : ComponentActivity() {
     // 4. A helper function to start the service
     private fun startBleService() {
         val serviceIntent = Intent(this, BleMeshService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(serviceIntent)
-        } else {
-            startService(serviceIntent)
-        }
+        startForegroundService(serviceIntent)
     }
 
     // 5. Define the required permissions based on Android version
