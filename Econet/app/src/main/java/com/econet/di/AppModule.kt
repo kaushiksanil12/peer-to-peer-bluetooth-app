@@ -37,11 +37,13 @@ object AppModule {
     }
 
     @Provides
+    @Singleton
     fun provideMessageDao(appDatabase: AppDatabase): MessageDao {
         return appDatabase.messageDao()
     }
 
     @Provides
+    @Singleton
     fun provideConversationDao(appDatabase: AppDatabase): ConversationDao {
         return appDatabase.conversationDao()
     }
