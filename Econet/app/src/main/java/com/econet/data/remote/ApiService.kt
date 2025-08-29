@@ -11,4 +11,6 @@ interface ApiService {
     suspend fun registerUser(
         @Body registerRequest: RegisterRequest
     ): Response<Unit>
+
+    // TODO: Add other endpoints here later (e.g., for message backup)
 }

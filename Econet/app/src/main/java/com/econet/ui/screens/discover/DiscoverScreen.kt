@@ -28,12 +28,14 @@ fun DiscoverScreen(
         Column(modifier = Modifier.padding(paddingValues).padding(16.dp)) {
             if (devices.isEmpty()) {
                 Text("Searching for nearby devices...")
+                Spacer(modifier = Modifier.height(16.dp))
+                CircularProgressIndicator()
             } else {
-                LazyColumn {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(devices) { device ->
                         DeviceListItem(device = device) {
                             discoverViewModel.connectToDevice(device.endpointId)
-                            onDeviceSelected() // Navigate to messaging screen
+                            onDeviceSelected()
                         }
                     }
                 }
@@ -47,13 +49,13 @@ fun DeviceListItem(device: DiscoveredDevice, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp)
-            .clickable(onClick = onClick)
+            .clickable(onClick = onClick),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Text(
             text = device.name,
             modifier = Modifier.padding(16.dp),
-            style = MaterialTheme.typography.bodyLarge
+            style = MaterialTheme.typography.titleMedium
         )
     }
 }

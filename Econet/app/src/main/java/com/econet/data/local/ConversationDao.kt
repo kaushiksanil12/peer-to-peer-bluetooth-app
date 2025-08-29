@@ -7,7 +7,8 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ConversationDao {
-    @Upsert // Inserts or updates a conversation
+    // Upsert will insert a new conversation or update an existing one if the partnerId matches.
+    @Upsert
     suspend fun upsertConversation(conversation: ConversationEntity)
 
     @Query("SELECT * FROM conversations ORDER BY lastMessageTimestamp DESC")

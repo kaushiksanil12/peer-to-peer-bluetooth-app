@@ -2,8 +2,6 @@ package com.econet.di
 
 import android.content.Context
 import androidx.room.Room
-import androidx.sqlite.db.SupportSQLiteDatabase
-import androidx.sqlite.db.SupportSQLiteOpenHelper
 import com.econet.data.AppRepository
 import com.econet.data.local.AppDatabase
 import com.econet.data.local.ConversationDao
@@ -14,7 +12,6 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
-import net.sqlcipher.database.SQLiteDatabase
 import net.sqlcipher.database.SupportFactory
 import javax.inject.Singleton
 
@@ -25,10 +22,8 @@ object AppModule {
     @Provides
     @Singleton
     fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase {
-        // Create the passphrase as a ByteArray
+        // In a real app, this passphrase should be retrieved securely from the Android Keystore.
         val passphrase = "your-very-secret-passphrase".toByteArray()
-
-        // Pass the ByteArray directly to the SupportFactory constructor
         val factory = SupportFactory(passphrase)
 
         return Room.databaseBuilder(
@@ -37,6 +32,7 @@ object AppModule {
             "econet_database"
         )
             .openHelperFactory(factory)
+            .fallbackToDestructiveMigration()
             .build()
     }
 
@@ -54,10 +50,9 @@ object AppModule {
     @Singleton
     fun provideAppRepository(
         messageDao: MessageDao,
-        conversationDao: ConversationDao, // <-- Add this
+        conversationDao: ConversationDao,
         apiService: ApiService
     ): AppRepository {
-        return AppRepository(messageDao, conversationDao, apiService) // <-- And this
+        return AppRepository(messageDao, conversationDao, apiService)
     }
-
 }

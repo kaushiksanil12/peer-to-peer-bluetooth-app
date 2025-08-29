@@ -19,6 +19,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.econet.ble.BleMeshService
 import com.econet.ui.screens.chats.ChatsScreen
+import com.econet.ui.screens.discover.DiscoverScreen
 import com.econet.ui.screens.messaging.MessagingScreen
 import com.econet.ui.screens.profile.ProfileScreen
 import com.econet.ui.theme.EconetTheme
@@ -56,7 +57,6 @@ class MainActivity : ComponentActivity() {
                     val navController = rememberNavController()
                     NavHost(
                         navController = navController,
-                        // If profile is created, start at the new chats list. Otherwise, start at profile creation.
                         startDestination = if (isProfileCreated) "chats" else "profile"
                     ) {
                         composable("profile") {
@@ -69,19 +69,26 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable("chats") {
-                            // When the chats screen is shown, request P2P permissions
                             LaunchedEffect(Unit) {
                                 requestPermissions()
                             }
                             ChatsScreen(
                                 onConversationSelected = { partnerId ->
-                                    // Navigate to a specific chat screen
                                     navController.navigate("messaging/$partnerId")
+                                },
+                                onDiscoverClick = {
+                                    navController.navigate("discover")
+                                }
+                            )
+                        }
+                        composable("discover") {
+                            DiscoverScreen(
+                                onDeviceSelected = {
+                                    navController.popBackStack()
                                 }
                             )
                         }
                         composable("messaging/{partnerId}") { backStackEntry ->
-                            // Extract the partnerId, though we aren't using it in the ViewModel yet
                             val partnerId = backStackEntry.arguments?.getString("partnerId")
                             MessagingScreen()
                         }
@@ -114,14 +121,31 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         private val REQUIRED_PERMISSIONS =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                arrayOf(
-                    Manifest.permission.BLUETOOTH_SCAN,
-                    Manifest.permission.BLUETOOTH_CONNECT,
-                    Manifest.permission.BLUETOOTH_ADVERTISE
-                )
-            } else {
-                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
+            when {
+                // Android 13 (API 33) and higher
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> {
+                    arrayOf(
+                        Manifest.permission.BLUETOOTH_SCAN,
+                        Manifest.permission.BLUETOOTH_CONNECT,
+                        Manifest.permission.BLUETOOTH_ADVERTISE,
+                        Manifest.permission.NEARBY_WIFI_DEVICES
+                    )
+                }
+                // Android 12 (API 31)
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+                    arrayOf(
+                        Manifest.permission.BLUETOOTH_SCAN,
+                        Manifest.permission.BLUETOOTH_CONNECT,
+                        Manifest.permission.BLUETOOTH_ADVERTISE
+                    )
+                }
+                // Older versions
+                else -> {
+                    arrayOf(
+                        Manifest.permission.ACCESS_FINE_LOCATION,
+                        Manifest.permission.ACCESS_COARSE_LOCATION
+                    )
+                }
             }
     }
 }

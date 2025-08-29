@@ -44,7 +44,7 @@ fun ProfileScreen(
 
         OutlinedTextField(
             value = name,
-            onValueChange = { name = it }, // This `it` is now correctly understood
+            onValueChange = { name = it },
             label = { Text("Enter your name") },
             singleLine = true,
             modifier = Modifier.fillMaxWidth()

@@ -1,9 +1,11 @@
 package com.econet.ui.screens.messaging
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.econet.ble.ServiceManager
 import com.econet.data.AppRepository
+import com.econet.data.local.ConversationEntity
 import com.econet.data.local.MessageEntity
 import com.econet.util.SharedPreferencesHelper
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -13,10 +15,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/**
- * A simple data class to represent a message in the UI,
- * decoupled from the database entity.
- */
 data class UiMessage(
     val id: String,
     val senderName: String,
@@ -27,14 +25,18 @@ data class UiMessage(
 @HiltViewModel
 class MessagingViewModel @Inject constructor(
     private val repository: AppRepository,
-    private val prefsHelper: SharedPreferencesHelper
+    private val prefsHelper: SharedPreferencesHelper,
+    savedStateHandle: SavedStateHandle // Hilt provides this to get navigation arguments
 ) : ViewModel() {
 
-    // The UI will get its messages by observing this flow, which comes directly
-    // from the Room database and is updated in real-time.
+    // Get the partner's ID from the navigation arguments passed in MainActivity
+    private val partnerId: String = savedStateHandle.get<String>("partnerId")!!
+
+    // This flow gets all messages. To show messages for only one chat,
+    // you would create a new function in your AppRepository and MessageDao.
     val messages = repository.getAllMessages()
         .map { dbMessages ->
-            // Convert the list of database entities to a list of UI-specific models.
+            // TODO: Filter messages to show only those between the current user and partnerId
             dbMessages.map { entity ->
                 UiMessage(
                     id = entity.messageId,
@@ -45,7 +47,6 @@ class MessagingViewModel @Inject constructor(
             }
         }
 
-    // Holds the current text in the input field.
     private val _currentMessageText = MutableStateFlow("")
     val currentMessageText = _currentMessageText.asStateFlow()
 
@@ -53,31 +54,40 @@ class MessagingViewModel @Inject constructor(
         _currentMessageText.value = newText
     }
 
-    /**
-     * Called when the user clicks the send button.
-     */
     fun onSendMessage() {
         val textToSend = _currentMessageText.value.trim()
         if (textToSend.isBlank()) return
 
         viewModelScope.launch {
-            // Create a database entity for the new message.
+            val myId = prefsHelper.userId ?: "unknown-id"
+            val myName = prefsHelper.userName ?: "Me"
+
             val messageEntity = MessageEntity(
                 messageId = System.currentTimeMillis().toString(),
-                originatorName = prefsHelper.userName ?: "Me",
-                originatorId = prefsHelper.userId ?: "unknown-id",
+                originatorName = myName,
+                originatorId = myId,
                 textPayload = textToSend,
                 isFromMe = true,
-                timestamp = System.currentTimeMillis()
+                timestamp = System.currentTimeMillis(),
+                isSynced = false // Assuming this field exists from the previous fix
             )
 
-            // 1. Save the message to the local database immediately.
+            // 1. Save the message to the local database
             repository.insertMessage(messageEntity)
 
-            // 2. Tell the running BleMeshService to broadcast the message to other peers.
+            // 2. Tell the service to send the message to other peers
             ServiceManager.bleMeshService?.sendMessage(messageEntity)
 
-            // 3. Clear the input field.
+            // 3. Create or update the conversation entry in the chats list
+            val conversation = ConversationEntity(
+                partnerId = partnerId,
+                partnerName = "Partner Name", // You would get this from the connection info
+                lastMessage = textToSend,
+                lastMessageTimestamp = System.currentTimeMillis()
+            )
+            repository.upsertConversation(conversation)
+
+            // 4. Clear the input field
             _currentMessageText.value = ""
         }
     }

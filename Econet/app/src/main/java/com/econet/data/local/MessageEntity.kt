@@ -7,10 +7,10 @@ import androidx.room.PrimaryKey
 data class MessageEntity(
     @PrimaryKey
     val messageId: String,
-    val originatorId: String,
     val originatorName: String,
+    val originatorId: String,
     val textPayload: String,
-    val timestamp: Long,
     val isFromMe: Boolean,
-    var isSynced: Boolean = false
+    val timestamp: Long,
+    val isSynced: Boolean = false
 )

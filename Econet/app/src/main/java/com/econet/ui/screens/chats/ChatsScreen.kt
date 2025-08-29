@@ -4,7 +4,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -18,18 +21,22 @@ import com.econet.data.local.ConversationEntity
 @Composable
 fun ChatsScreen(
     onConversationSelected: (partnerId: String) -> Unit,
+    onDiscoverClick: () -> Unit,
     chatsViewModel: ChatsViewModel = hiltViewModel()
 ) {
-    // This line will now work correctly because the ViewModel's flow is well-defined.
     val conversations by chatsViewModel.conversations.collectAsState(initial = emptyList())
 
     Scaffold(
         topBar = {
             TopAppBar(title = { Text("Chats") })
+        },
+        floatingActionButton = {
+            FloatingActionButton(onClick = onDiscoverClick) {
+                Icon(Icons.Default.Add, contentDescription = "Discover new devices")
+            }
         }
     ) { paddingValues ->
         LazyColumn(modifier = Modifier.padding(paddingValues)) {
-            // The 'conversation' item is now correctly inferred as ConversationEntity
             items(conversations) { conversation ->
                 ConversationListItem(
                     conversation = conversation,
@@ -51,5 +58,5 @@ fun ConversationListItem(conversation: ConversationEntity, onClick: () -> Unit) 
         Text(text = conversation.partnerName, fontWeight = FontWeight.Bold)
         Text(text = conversation.lastMessage, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
     }
-    Divider()
+    HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
 }

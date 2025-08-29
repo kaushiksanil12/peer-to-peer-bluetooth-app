@@ -9,6 +9,5 @@ import javax.inject.Inject
 class ChatsViewModel @Inject constructor(
     private val repository: AppRepository
 ) : ViewModel() {
-    // Get a real-time list of all conversations from the database
     val conversations = repository.getAllConversations()
 }

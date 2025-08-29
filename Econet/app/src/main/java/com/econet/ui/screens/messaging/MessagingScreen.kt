@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -25,7 +26,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 fun MessagingScreen(
     messagingViewModel: MessagingViewModel = hiltViewModel()
 ) {
-    // Collect the Flow as state. `emptyList()` is the initial value before the flow emits.
     val messages by messagingViewModel.messages.collectAsState(initial = emptyList())
     val currentMessageText by messagingViewModel.currentMessageText.collectAsState()
 
@@ -116,7 +116,7 @@ fun MessageInputBar(
             enabled = text.isNotBlank()
         ) {
             Icon(
-                imageVector = Icons.Default.Send,
+                imageVector = Icons.AutoMirrored.Filled.Send,
                 contentDescription = "Send Message"
             )
         }
